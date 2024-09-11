@@ -46,6 +46,9 @@ class LengowProduct extends Product
         'marketplace_order_line_id',
         'quantity',
         'amount',
+        //[2021-11-18] - (josecarlosphp.com) - tax and shipping are relevant, we will use them in LengowPaymentModule.
+        'tax',
+        'shipping',
     ];
 
     /**

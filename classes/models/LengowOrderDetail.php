@@ -167,4 +167,29 @@ class LengowOrderDetail extends OrderDetail
 
         return '';
     }
+
+    /**
+     * [2021-11-23] - (josecarlosphp.com)
+     * Forzar parámetro $use_taxes a false si el total del producto es igual al total con impuestos.
+     */
+    protected function create(Order $order, Cart $cart, $product, $id_order_state, $id_order_invoice, $use_taxes = true, $id_warehouse = 0)
+    {
+        return parent::create($order, $cart, $product, $id_order_state, $id_order_invoice, $use_taxes && (round($product['total']) != round($product['total_wt'])), $id_warehouse);
+    }
+
+    /**
+     * [2021-11-23] - (josecarlosphp.com)
+     * Forzar tax_name en blanco, tax_rate a cero, y tax_calculator a null,
+     * si el total del producto es igual al total con impuestos.
+     */
+    protected function setProductTax(Order $order, $product)
+    {
+        parent::setProductTax($order, $product);
+
+        if ((round($product['total']) == round($product['total_wt']))) {
+            $this->tax_name = '';
+            $this->tax_rate = 0;
+            $this->tax_calculator = null;
+        }
+    }
 }

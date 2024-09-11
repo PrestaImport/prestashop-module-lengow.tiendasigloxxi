@@ -125,7 +125,13 @@ class LengowMarketplace
             self::loadApiMarketplace(true);
         }
         if (!isset(self::$marketplaces->{$this->name})) {
-            throw new LengowException(LengowMain::setLogMessage('lengow_log.exception.marketplace_not_present', ['marketplace_name' => $this->name]));
+            /* [2024-05-02] - (josecarlosphp.com) - No lanzar la excepción, porque entonces no se cargan pedidos web */
+            /* throw new LengowException(
+                LengowMain::setLogMessage(
+                    'lengow_log.exception.marketplace_not_present',
+                    ['marketplace_name' => $this->name]
+                )
+            ); */
         }
         $this->marketplace = self::$marketplaces->{$this->name};
         if (!empty($this->marketplace)) {

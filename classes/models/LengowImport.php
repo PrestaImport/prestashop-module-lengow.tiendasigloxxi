@@ -922,6 +922,26 @@ class LengowImport
             }
             // set current order to cancel hook updateOrderStatus
             self::$currentOrder = $marketplaceSku;
+
+            //[2022-04-18] (josecarlosphp.com) Escribir log
+            /*if (!is_dir(dirname(__FILE__) . '/../../logs/orders/' . date('Y'))) {
+                mkdir(dirname(__FILE__) . '/../../logs/orders/' . date('Y'));
+            }
+            if (!is_dir(dirname(__FILE__) . '/../../logs/orders/' . date('Y'). '/' . date('m'))) {
+                mkdir(dirname(__FILE__) . '/../../logs/orders/' . date('Y'). '/' . date('m'));
+            }
+            if (!is_dir(dirname(__FILE__) . '/../../logs/orders/' . date('Y'). '/' . date('m') . '/' . date('d'))) {
+                mkdir(dirname(__FILE__) . '/../../logs/orders/' . date('Y'). '/' . date('m') . '/' . date('d'));
+            }
+            $file = dirname(__FILE__)
+                . '/../../logs/orders/'
+                . date('Y') . '/' . date('m') . '/' . date('d') . '/'
+                . $marketplaceSku . '.log';
+            if (/*is_object($orderData)
+                &&*//* !is_file($file)) {
+                file_put_contents($file, json_encode($orderData));
+            }*/
+
             // if order contains no package
             if (empty($orderData->packages)) {
                 $message = LengowMain::setLogMessage('log.import.error_no_package');

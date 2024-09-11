@@ -71,6 +71,10 @@ class LengowPaymentModule extends PaymentModule
         if (!isset($this->context)) {
             $this->context = Context::getContext();
         }
+
+        //[2021-11-15] (josecarlosphp.com) Log
+        $miLog = '$lengowProducts = ' . var_export($lengowProducts, true) . "\n";
+
         $this->context->cart = new Cart($idCart);
         $this->context->customer = new Customer($this->context->cart->id_customer);
         // the tax cart is loaded before the customer so re-cache the tax calculation method
@@ -165,6 +169,15 @@ class LengowPaymentModule extends PaymentModule
 
         CartRule::cleanCache();
 
+        //[2021-12-29] - (josecarlosphp.com) - Check if we will apply customizations.
+        $tsxxi_apply_custom = true;
+        if (($aux = Configuration::get('TSXXI_NO_CUSTOM_LENGOW_MARKETPLACES'))) {
+            $no_custom_marketplaces = implode(',', str_replace(', ', ',', $aux));
+            if (in_array($paymentMethod, $no_custom_marketplaces)) {
+                $tsxxi_apply_custom = false;
+            }
+        }
+
         foreach ($packageList as $idAddress => $packageByAddress) {
             foreach ($packageByAddress as $idPackage => $package) {
                 $order = new Order();
@@ -214,19 +227,37 @@ class LengowPaymentModule extends PaymentModule
                 $totalProducts = 0;
                 $totalProductsWt = 0;
 
+                //[2021-11-15] (josecarlosphp.com) Log
+                $miLog .= '$package[\'product_list\'] = ' . var_export($package['product_list'], true) . "\n";
+
+                //[2021-11-18] (josecarlosphp.com)
+                $maxTaxRate = 0;
+
                 foreach ($package['product_list'] as &$product) {
                     $sku = $product['id_product'];
                     $sku .= empty($product['id_product_attribute']) ? '' : '_' . $product['id_product_attribute'];
                     if (isset($lengowProducts[$sku])) {
                         $product['price_wt'] = $lengowProducts[$sku]['price_unit'];
-                        $product['price'] = Tools::ps_round(
-                            LengowProduct::calculatePriceWithoutTax(
-                                $product,
-                                $order->{Configuration::get('PS_TAX_ADDRESS_TYPE')},
-                                $this->context
-                            ),
-                            $precision
-                        );
+                        //[2021-12-29] - (josecarlosphp.com) - Only if apply customizations.
+                        if ($tsxxi_apply_custom) {
+                            $product['price'] = Tools::ps_round(
+                                //[2021-11-18] (josecarlosphp.com) Forzar con el tax que viene de Lengow
+                                $lengowProducts[$sku]['price_unit'] / (1 + ($lengowProducts[$sku]['tax_rate'] / 100)),
+                                $precision
+                            );
+                        } else {
+                            $product['price'] = Tools::ps_round(
+                                LengowProduct::calculatePriceWithoutTax(
+                                    $product,
+                                    $order->{Configuration::get('PS_TAX_ADDRESS_TYPE')},
+                                    $this->context
+                                ),
+                                $precision
+                            );
+                        }
+                        //[2021-11-18] (josecarlosphp.com)
+                        $maxTaxRate = max($maxTaxRate, $lengowProducts[$sku]['tax_rate']);
+
                         $product['total'] = (float) $product['price'] * (int) $product['quantity'];
                         $product['total_wt'] = Tools::ps_round(
                             (float) $product['price_wt'] * (int) $product['quantity'],
@@ -241,6 +272,14 @@ class LengowPaymentModule extends PaymentModule
                     }
                 }
 
+                //[2021-11-15] (josecarlosphp.com) Log
+                $miLog .= '$package[\'product_list\'] = ' . var_export($package['product_list'], true)."\n";
+
+                //[2021-11-15] (josecarlosphp.com) Escribir log
+                /*if (!is_file($file = dirname(__FILE__).'/'.$idCart.'.log')) {
+                    file_put_contents($file, $miLog);
+                }*/
+
                 $order->product_list = $package['product_list'];
                 $order->total_products = (float) Tools::ps_round($totalProducts, $precision);
                 $order->total_products_wt = (float) Tools::ps_round($totalProductsWt, $precision);
@@ -250,9 +289,15 @@ class LengowPaymentModule extends PaymentModule
                 $order->total_discounts = $order->total_discounts_tax_incl;
 
                 // calculate shipping tax free
-                $order->carrier_tax_rate = $carrier->getTaxesRate(
-                    new Address($this->context->cart->{Configuration::get('PS_TAX_ADDRESS_TYPE')})
-                );
+                //[2021-12-29] - (josecarlosphp.com) - Only if apply customizations.
+                if ($tsxxi_apply_custom) {
+                    //[2021-11-18] (josecarlosphp.com)
+                    $order->carrier_tax_rate = $maxTaxRate;
+                } else {
+                    $order->carrier_tax_rate = $carrier->getTaxesRate(
+                        new Address($this->context->cart->{Configuration::get('PS_TAX_ADDRESS_TYPE')})
+                    );
+                }
                 $totalShippingTaxExcl = $lengowShippingCosts / (1 + ($order->carrier_tax_rate / 100));
 
                 $order->total_shipping_tax_excl = (float) Tools::ps_round($totalShippingTaxExcl, $precision);
@@ -460,8 +505,15 @@ class LengowPaymentModule extends PaymentModule
 
         // update Order Details Tax in case cart rules have free shipping
         foreach ($order->getOrderDetailList() as $detail) {
-            $orderDetail = new OrderDetail($detail['id_order_detail']);
-            $orderDetail->updateTaxAmount($order);
+            //[2021-11-28] - (josecarlosphp.com) - Actualizar sólo si no aplicar personalizaciones o hay tax_rate
+            if (empty($tsxxi_apply_custom) || $detail['tax_rate']) {
+                $orderDetail = new OrderDetail($detail['id_order_detail']);
+                $orderDetail->updateTaxAmount($order);
+                //TODO: Estas tres líneas pueden sobrar (ser de una versión anterior del módulo Lengow)
+                $orderDetail->product_price = $orderDetail->unit_price_tax_excl;
+                $orderDetail->original_product_price = $orderDetail->product_price;
+                $orderDetail->save();
+            }
         }
 
         // use the last order as currentOrder
