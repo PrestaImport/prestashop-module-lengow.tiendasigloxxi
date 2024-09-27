@@ -453,7 +453,7 @@ class LengowMarketplace
         $trackingNumber = $orderCarrier->tracking_number ?? '';
         $returnTrackingNumber = $orderCarrier->return_tracking_number ?? '';
         if ($trackingNumber === '') {
-            $trackingNumber = $lengowOrder->shipping_number;
+            $trackingNumber = $lengowOrder->shipping_number ?? '';
         }
         foreach ($marketplaceArguments as $arg) {
             switch ($arg) {
