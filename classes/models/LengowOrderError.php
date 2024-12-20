@@ -53,9 +53,17 @@ class LengowOrderError
      */
     public static function lengowOrderIsInError($idLengowOrder)
     {
-        $query = 'SELECT lli.id FROM ' . _DB_PREFIX_ . 'lengow_logs_import lli
-            LEFT JOIN ' . _DB_PREFIX_ . 'lengow_orders lo ON lli.id_order_lengow = lo.id
-            WHERE lo.id = ' . (int) $idLengowOrder . ' AND lli.is_finished = 0 AND lo.order_process_state != 2';
+        $query = sprintf('SELECT lli.%s FROM ' . _DB_PREFIX_ . '%s lli
+            LEFT JOIN ' . _DB_PREFIX_ . '%s lo ON lli.%s = lo.id
+            WHERE lo.id = ' . (int) $idLengowOrder . ' AND lli.%s = 0 AND lo.%s != %u',
+            self::FIELD_ID,
+            self::TABLE_ORDER_ERROR,
+            LengowOrder::TABLE_ORDER,
+            self::FIELD_ORDER_LENGOW_ID,
+            self::FIELD_IS_FINISHED,
+            LengowOrder::FIELD_ORDER_PROCESS_STATE,
+            LengowOrder::PROCESS_STATE_FINISH
+        );
         try {
             $results = Db::getInstance()->executeS($query);
 
